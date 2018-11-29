@@ -1,0 +1,70 @@
+version: "3.3"
+services:
+
+  traefik:
+    image: traefik
+    command: --web \
+      --docker \
+      --docker.swarmmode \
+      --docker.domain=traefik \
+      --docker.watch \
+      --logLevel=DEBUG
+    networks:
+      - gateway
+    ports:
+      - "80:80"
+      - "8880:8080"
+      - "443:443"
+    labels:
+      - "traefik.enable=false"
+      - "traefik.acme.onhostrule=true"
+      - "traefik.acme.entryPoint=https"
+      - "traefik.entryPoints.http=80"
+      - "traefik.entryPoints.https.address=443"
+      - "traefik.entryPoints.https.tls"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /dev/null:/traefik.toml
+    deploy:
+      placement:
+        constraints: [node.role==manager]
+
+  portainer:
+    image: portainer/portainer
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "/opt/portainer:/data"
+    networks:
+      - gateway
+    command: -H tcp://tasks.agent:9001 --tlsskipverify
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+      labels:
+        - "traefik.enable=true"
+        - "traefik.port=9000"
+        - "traefik.docker.network=gateweay"
+        - "traefik.acme.email='infrastructure@dallasmakerspace.org'"
+        - "traefik.acme.domains=communitygrid.dallasmakerspace.org"
+        - "traefik.frontend.rule=HostRegexp:{catchall:.*}"
+        - "traefik.frontend.priority=1"
+        
+  portainer-agent:
+    image: portainer/agent
+    environment:
+      AGENT_CLUSTER_ADDR: tasks.agent
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "9001:9001"
+    networks:
+      - portainer_agent
+    deploy:
+      mode: global
+
+networks:
+  portainer_agent:
+    driver: overlay
+    
+  gateway:
+    driver: overlay
