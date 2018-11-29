@@ -17,4 +17,10 @@ end
 
 eval $(docker-machine env default)
 docker swarm init
+docker network create -d overlay --subnet=192.168.88.0/24 --scope swarm public
+docker network create -d overlay --subnet=192.168.87.0/24 --scope swarm internal
 docker stack deploy -c docker-compose.yml $(basename "$(pwd)")
+
+
+eval $(docker-machine env worker1)
+eval $(docker-machine ssh default docker swarm join --token-worker)
